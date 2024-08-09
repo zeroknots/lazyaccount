@@ -1,5 +1,4 @@
- 
-use alloy::primitives::{address, Address, b256, U256, Bytes, FixedBytes, B256};
+use alloy::primitives::{address, b256, Address, Bytes, FixedBytes, B256, U256};
 use alloy::sol;
 use async_trait::async_trait;
 use std::error::Error as StdError;
@@ -11,6 +10,14 @@ sol! {
     type ExecType is bytes1;
     type ModeSelector is bytes4;
     type ModePayload is bytes22;
+
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct Execution {
+        address target;
+        uint256 value;
+        bytes callData;
+    }
 
     #[derive(Debug, PartialEq, Eq)]
     contract ERC7579Account {
@@ -52,14 +59,15 @@ pub const BATCH_EXECUTION_MODE: ModeCode = ModeCode({
 });
 
 impl PackedUserOperation {
-
     pub fn new() -> PackedUserOperation {
         PackedUserOperation {
             sender: Address::default(),
             nonce: U256::from(0),
             initCode: Bytes::default(),
             callData: Bytes::default(),
-            accountGasLimits: b256!("0000000000000000000000000000000000000000000000000000000000000010"),
+            accountGasLimits: b256!(
+                "0000000000000000000000000000000000000000000000000000000000000010"
+            ),
             preVerificationGas: U256::from(100000),
             gasFees: b256!("0000000000000000000000000000000000000000000000000000000000000010"),
             paymasterAndData: Bytes::default(),
