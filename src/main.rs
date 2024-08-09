@@ -2,7 +2,7 @@ mod account;
 mod config;
 mod erc4337;
 mod execution;
-use crate::account::{BaseAccount, Bundler, SmartAccount};
+use crate::account::{BaseAccount, SmartAccount};
 use crate::config::{parse_config, Config};
 use crate::erc4337::{Execution, PackedUserOperation};
 use crate::execution::ExecutionHelper;
@@ -58,7 +58,7 @@ async fn run(config: Config, priv_key: String) -> Result<(), Box<dyn StdError>> 
         .with_sender(account_address)
         .with_nonce(nonce)
         .with_calldata(execution);
-    account.send_user_op(userop).await?;
+    // account.send_user_op(userop).await?;
 
     Ok(())
 }

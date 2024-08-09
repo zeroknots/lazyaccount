@@ -1,4 +1,5 @@
 use alloy::primitives::{address, b256, Address, Bytes, FixedBytes, B256, U256};
+use crate::account::SmartAccount;
 use alloy::sol;
 use async_trait::async_trait;
 use std::error::Error as StdError;
@@ -112,3 +113,31 @@ impl PackedUserOperation {
         self
     }
 }
+
+//
+// #[async_trait]
+// pub trait Bundler {
+//     async fn send_user_op(&self, userop: PackedUserOperation) -> Result<(), Box<dyn StdError>>;
+// }
+//
+// #[async_trait]
+// impl<'a> Bundler for SmartAccount<'a> {
+//     async fn send_user_op(&self, userop: PackedUserOperation) -> Result<(), Box<dyn StdError>> {
+//         let ep: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
+//         let contract = EntryPoint::new(ep, self.provider.as_ref().unwrap());
+//
+//         let tx_hash = contract
+//             .handleOps(vec![userop], ep)
+//             .gas(100000)
+//             .max_fee_per_gas(200000000000)
+//             .max_priority_fee_per_gas(1500000000)
+//             .send()
+//             .await?
+//             .watch()
+//             .await?;
+//
+//         println!("{:?}", tx_hash);
+//
+//         Ok(())
+//     }
+// }

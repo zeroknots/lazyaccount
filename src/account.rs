@@ -58,8 +58,6 @@ pub enum AccountType {
 pub struct SmartAccount<'a> {
     pub account_type: AccountType,
     pub address: Option<Address>,
-    // pub execution_cache: Option<ERC7579Account::ERC7579AccountCalls>,
-    // pub validators: Option<Vec<Address>>,
     pub provider: Option<Arc<Foo<'a>>>,
 }
 
@@ -68,8 +66,6 @@ impl<'a> SmartAccount<'a> {
         let account = SmartAccount {
             account_type: AccountType::Safe7579,
             address: None,
-            // execution_cache: None,
-            // validators: None,
             provider: None,
         };
         account
@@ -90,6 +86,7 @@ impl<'a> SmartAccount<'a> {
 #[async_trait]
 pub trait BaseAccount {
     async fn get_nonce(&self, validator_module: Address) -> Result<U256, Box<dyn StdError>>;
+    async fn send_user_op(&self, userop: PackedUserOperation) -> Result<(), Box<dyn StdError>>;
 }
 
 #[async_trait]
@@ -108,15 +105,7 @@ impl<'a> BaseAccount for SmartAccount<'a> {
         let nonce = U256::from(0);
         Ok(nonce)
     }
-}
 
-#[async_trait]
-pub trait Bundler {
-    async fn send_user_op(&self, userop: PackedUserOperation) -> Result<(), Box<dyn StdError>>;
-}
-
-#[async_trait]
-impl<'a> Bundler for SmartAccount<'a> {
     async fn send_user_op(&self, userop: PackedUserOperation) -> Result<(), Box<dyn StdError>> {
         let ep: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
         let contract = EntryPoint::new(ep, self.provider.as_ref().unwrap());
@@ -135,4 +124,6 @@ impl<'a> Bundler for SmartAccount<'a> {
 
         Ok(())
     }
+
 }
+
