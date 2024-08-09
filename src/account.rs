@@ -1,6 +1,9 @@
 use alloy::contract::SolCallBuilder;
 use alloy::network::{Ethereum, EthereumWallet};
 use alloy::primitives::{address, Address, U128, U256};
+use alloy::providers::fillers::{
+    ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
+};
 use alloy::providers::{ProviderBuilder, RootProvider};
 use alloy::sol;
 use alloy::transports::http::reqwest::Url;
@@ -27,6 +30,19 @@ pub type HttpProvider<'a> = alloy::providers::fillers::FillProvider<
 //     alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>,
 //     alloy::transports::http::Http<alloy::transports::http::Client>,
 //     alloy::network::Ethereum,>;
+//
+pub type Foo<'a> = FillProvider<
+    JoinFill<
+        JoinFill<
+            JoinFill<JoinFill<alloy::providers::Identity, GasFiller>, NonceFiller>,
+            ChainIdFiller,
+        >,
+        WalletFiller<&'a EthereumWallet>,
+    >,
+    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>,
+    alloy::transports::http::Http<alloy::transports::http::Client>,
+    alloy::network::Ethereum,
+>;
 
 pub type RootProviderType<'a> =
     alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>;
@@ -44,7 +60,7 @@ pub struct SmartAccount<'a> {
     pub address: Option<Address>,
     // pub execution_cache: Option<ERC7579Account::ERC7579AccountCalls>,
     // pub validators: Option<Vec<Address>>,
-    pub provider: Option<Arc<HttpProvider<'a>>>,
+    pub provider: Option<Arc<Foo<'a>>>,
 }
 
 impl<'a> SmartAccount<'a> {
@@ -59,7 +75,13 @@ impl<'a> SmartAccount<'a> {
         account
     }
     pub fn with_url(mut self, url: Url, wallet: &'a EthereumWallet) -> Self {
-        let provider: HttpProvider = ProviderBuilder::new().wallet(wallet).on_http(url);
+        // let provider: HttpProvider = ProviderBuilder::new().wallet(wallet).on_http(url);
+        let provider = ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(wallet)
+            .on_http(url);
+        println!("{:?}", provider);
+
         self.provider = Some(Arc::new(provider));
         self
     }
@@ -99,7 +121,6 @@ impl<'a> Bundler for SmartAccount<'a> {
         let ep: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
         let contract = EntryPoint::new(ep, self.provider.as_ref().unwrap());
 
-
         let tx_hash = contract
             .handleOps(vec![userop], ep)
             .gas(100000)
@@ -115,4 +136,3 @@ impl<'a> Bundler for SmartAccount<'a> {
         Ok(())
     }
 }
-
