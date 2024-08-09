@@ -1,7 +1,7 @@
 use alloy::contract::SolCallBuilder;
 use alloy::network::{Ethereum, EthereumWallet};
-use alloy::primitives::{address, Address, U256};
-use alloy::providers::ProviderBuilder;
+use alloy::primitives::{address, Address, U128, U256};
+use alloy::providers::{ProviderBuilder, RootProvider};
 use alloy::sol;
 use alloy::transports::http::reqwest::Url;
 use async_trait::async_trait;
@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use crate::erc4337::{ERC7579Account, EntryPoint, PackedUserOperation};
 
-type HttpProvider<'a> = alloy::providers::fillers::FillProvider<
+pub type HttpProvider<'a> = alloy::providers::fillers::FillProvider<
     alloy::providers::fillers::JoinFill<
         alloy::providers::Identity,
         alloy::providers::fillers::WalletFiller<&'a EthereumWallet>,
@@ -20,6 +20,16 @@ type HttpProvider<'a> = alloy::providers::fillers::FillProvider<
     alloy::transports::http::Http<alloy::transports::http::Client>,
     alloy::network::Ethereum,
 >;
+
+// pub type FillProvider<'a> = alloy::providers::fillers::FillProvider<
+// alloy::providers::fillers::JoinFill<alloy::providers::Identity,
+//   alloy::providers::fillers::WalletFiller<&'a EthereumWallet>>,
+//     alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>,
+//     alloy::transports::http::Http<alloy::transports::http::Client>,
+//     alloy::network::Ethereum,>;
+
+pub type RootProviderType<'a> =
+    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub enum AccountType {
@@ -32,27 +42,27 @@ pub enum AccountType {
 pub struct SmartAccount<'a> {
     pub account_type: AccountType,
     pub address: Option<Address>,
-    pub execution_cache: Option<ERC7579Account::ERC7579AccountCalls>,
-    pub validators: Option<Vec<Address>>,
+    // pub execution_cache: Option<ERC7579Account::ERC7579AccountCalls>,
+    // pub validators: Option<Vec<Address>>,
     pub provider: Option<Arc<HttpProvider<'a>>>,
 }
 
 impl<'a> SmartAccount<'a> {
-    pub fn new() -> Self{
-        Ok(SmartAccount {
+    pub fn new() -> SmartAccount<'a> {
+        let account = SmartAccount {
             account_type: AccountType::Safe7579,
             address: None,
-            execution_cache: None,
-            validators: None,
+            // execution_cache: None,
+            // validators: None,
             provider: None,
-        })
+        };
+        account
     }
-    pub fn with_url(mut self, url: Url, wallet: &'a EthereumWallet) -> Self{
+    pub fn with_url(mut self, url: Url, wallet: &'a EthereumWallet) -> Self {
         let provider: HttpProvider = ProviderBuilder::new().wallet(wallet).on_http(url);
         self.provider = Some(Arc::new(provider));
         self
     }
-
 }
 
 #[async_trait]
@@ -87,10 +97,14 @@ pub trait Bundler {
 impl<'a> Bundler for SmartAccount<'a> {
     async fn send_user_op(&self, userop: PackedUserOperation) -> Result<(), Box<dyn StdError>> {
         let ep: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
-
         let contract = EntryPoint::new(ep, self.provider.as_ref().unwrap());
+
+
         let tx_hash = contract
             .handleOps(vec![userop], ep)
+            .gas(100000)
+            .max_fee_per_gas(200000000000)
+            .max_priority_fee_per_gas(1500000000)
             .send()
             .await?
             .watch()
@@ -101,3 +115,4 @@ impl<'a> Bundler for SmartAccount<'a> {
         Ok(())
     }
 }
+
