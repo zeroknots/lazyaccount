@@ -58,7 +58,8 @@ pub enum AccountType {
 pub struct SmartAccount<'a> {
     pub account_type: AccountType,
     pub address: Option<Address>,
-    pub provider: Option<Arc<Foo<'a>>>,
+    pub provider: Option<Arc<RootProviderType<'a>>>,
+    pub url_provider: Option<Arc<Foo<'a>>>,
 }
 
 impl<'a> SmartAccount<'a> {
@@ -66,19 +67,23 @@ impl<'a> SmartAccount<'a> {
         let account = SmartAccount {
             account_type: AccountType::Safe7579,
             address: None,
+            url_provider: None,
             provider: None,
         };
         account
     }
     pub fn with_url(mut self, url: Url, wallet: &'a EthereumWallet) -> Self {
-        // let provider: HttpProvider = ProviderBuilder::new().wallet(wallet).on_http(url);
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
             .on_http(url);
         println!("{:?}", provider);
 
-        self.provider = Some(Arc::new(provider));
+        self.url_provider = Some(Arc::new(provider));
+        self
+    }
+    pub fn with_provider(mut self, provider: Arc<RootProviderType<'a>>) -> Self {
+        self.provider = Some(provider);
         self
     }
 }

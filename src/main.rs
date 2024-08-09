@@ -15,6 +15,7 @@ use std::error::Error as StdError;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::{fs, str::FromStr};
+use alloy::{node_bindings::Anvil,  providers::ProviderBuilder };
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -35,13 +36,21 @@ async fn main() -> Result<(), Box<dyn StdError>> {
 }
 
 async fn run(config: Config, priv_key: String) -> Result<(), Box<dyn StdError>> {
-    let signer = PrivateKeySigner::from_str(&priv_key)?;
-    let wallet = EthereumWallet::from(signer);
-    let rpc_url = Url::parse("http://localhost:8545");
+    // let signer = PrivateKeySigner::from_str(&priv_key)?;
+    // let wallet = EthereumWallet::from(signer);
+    // let url = Url::parse("http://localhost:8545");
+
+    let anvil = Anvil::new().fork("https://sepolia.drpc.org").try_spawn()?;
+
+    // Create a provider.
+    let rpc_url = anvil.endpoint().parse()?;
+    let provider = ProviderBuilder::new().on_http(rpc_url);
 
     println!("Hello LazyAccount");
 
-    let account = SmartAccount::new().with_url(rpc_url?, &wallet);
+
+    let account = SmartAccount::new().with_provider(Arc::new(provider));
+    // let account = SmartAccount::new().with_url(url?, &wallet);
 
     let account_address = address!("70997970C51812dc3A010C7d01b50e0d17dc79C8");
     let validator = address!("fB43116489394D843B2B29a7F6aa3eC0d590d795");
@@ -58,7 +67,7 @@ async fn run(config: Config, priv_key: String) -> Result<(), Box<dyn StdError>> 
         .with_sender(account_address)
         .with_nonce(nonce)
         .with_calldata(execution);
-    // account.send_user_op(userop).await?;
+    account.send_user_op(userop).await?;
 
     Ok(())
 }
