@@ -1,6 +1,6 @@
 use alloy::contract::SolCallBuilder;
 use alloy::network::{Ethereum, EthereumWallet};
-use alloy::primitives::{address, Address, U128, U256};
+use alloy::primitives::{address, Address, Bytes, U128, U256};
 use alloy::providers::fillers::{
     ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
 };
@@ -59,6 +59,7 @@ pub struct SmartAccount<'a> {
     pub account_type: AccountType,
     pub address: Option<Address>,
     pub provider: Option<Arc<RootProviderType<'a>>>,
+    pub init_code:Option<Bytes>,
     pub url_provider: Option<Arc<Foo<'a>>>,
 }
 
@@ -69,6 +70,7 @@ impl<'a> SmartAccount<'a> {
             address: None,
             url_provider: None,
             provider: None,
+            init_code: None,
         };
         account
     }
@@ -84,6 +86,10 @@ impl<'a> SmartAccount<'a> {
     }
     pub fn with_provider(mut self, provider: Arc<RootProviderType<'a>>) -> Self {
         self.provider = Some(provider);
+        self
+    }
+    pub fn with_init_code(mut self, init_code: Bytes) -> Self {
+        self.init_code = Some(init_code);
         self
     }
 }
@@ -105,15 +111,19 @@ impl<'a> BaseAccount for SmartAccount<'a> {
         let ep: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
         let contract = EntryPoint::new(ep, self.provider.as_ref().unwrap());
         let EntryPoint::getNonceReturn { nonce } =
-            contract.getNonce(validator_module, key).call().await?;
+            contract.getNonce(self.address, key).call().await?;
         println!("Nonce: {:?}", nonce);
         let nonce = U256::from(0);
         Ok(nonce)
     }
 
-    async fn send_user_op(&self, userop: PackedUserOperation) -> Result<(), Box<dyn StdError>> {
+    async fn send_user_op(&self, mut userop: PackedUserOperation) -> Result<(), Box<dyn StdError>> {
         let ep: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
         let contract = EntryPoint::new(ep, self.provider.as_ref().unwrap());
+
+        if let Some(init_code) = &self.init_code {
+            userop.initCode = init_code.clone();
+        }
 
         let tx_hash = contract
             .handleOps(vec![userop], ep)
