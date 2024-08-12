@@ -1,6 +1,7 @@
+use crate::types::{Foo, RootProviderType};
 use alloy::contract::SolCallBuilder;
 use alloy::network::{Ethereum, EthereumWallet};
-use alloy::primitives::{address, Address, Bytes, U128, U256};
+use alloy::primitives::{address, Address, Bytes, FixedBytes, U128, U256};
 use alloy::providers::fillers::{
     ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
 };
@@ -14,39 +15,6 @@ use std::sync::Arc;
 
 use crate::erc4337::{ERC7579Account, EntryPoint, PackedUserOperation};
 
-pub type HttpProvider<'a> = alloy::providers::fillers::FillProvider<
-    alloy::providers::fillers::JoinFill<
-        alloy::providers::Identity,
-        alloy::providers::fillers::WalletFiller<&'a EthereumWallet>,
-    >,
-    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>,
-    alloy::transports::http::Http<alloy::transports::http::Client>,
-    alloy::network::Ethereum,
->;
-
-// pub type FillProvider<'a> = alloy::providers::fillers::FillProvider<
-// alloy::providers::fillers::JoinFill<alloy::providers::Identity,
-//   alloy::providers::fillers::WalletFiller<&'a EthereumWallet>>,
-//     alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>,
-//     alloy::transports::http::Http<alloy::transports::http::Client>,
-//     alloy::network::Ethereum,>;
-//
-pub type Foo<'a> = FillProvider<
-    JoinFill<
-        JoinFill<
-            JoinFill<JoinFill<alloy::providers::Identity, GasFiller>, NonceFiller>,
-            ChainIdFiller,
-        >,
-        WalletFiller<&'a EthereumWallet>,
-    >,
-    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>,
-    alloy::transports::http::Http<alloy::transports::http::Client>,
-    alloy::network::Ethereum,
->;
-
-pub type RootProviderType<'a> =
-    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>;
-
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub enum AccountType {
     Unknown,
@@ -59,7 +27,7 @@ pub struct SmartAccount<'a> {
     pub account_type: AccountType,
     pub address: Option<Address>,
     pub provider: Option<Arc<RootProviderType<'a>>>,
-    pub init_code:Option<Bytes>,
+    pub init_code: Option<Bytes>,
     pub url_provider: Option<Arc<Foo<'a>>>,
 }
 
@@ -97,7 +65,10 @@ impl<'a> SmartAccount<'a> {
 #[async_trait]
 pub trait BaseAccount {
     async fn get_nonce(&self, validator_module: Address) -> Result<U256, Box<dyn StdError>>;
-    async fn send_user_op(&self, userop: PackedUserOperation) -> Result<(), Box<dyn StdError>>;
+    async fn send_user_op(
+        &self,
+        userop: PackedUserOperation,
+    ) -> Result<FixedBytes<32>, Box<dyn StdError>>;
 }
 
 #[async_trait]
@@ -111,13 +82,17 @@ impl<'a> BaseAccount for SmartAccount<'a> {
         let ep: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
         let contract = EntryPoint::new(ep, self.provider.as_ref().unwrap());
         let EntryPoint::getNonceReturn { nonce } =
-            contract.getNonce(self.address, key).call().await?;
+            // TODO: fix the unwrap_or to actually point the counterfactual
+            contract.getNonce(self.address.unwrap_or(Address::ZERO), key).call().await?;
         println!("Nonce: {:?}", nonce);
         let nonce = U256::from(0);
         Ok(nonce)
     }
 
-    async fn send_user_op(&self, mut userop: PackedUserOperation) -> Result<(), Box<dyn StdError>> {
+    async fn send_user_op(
+        &self,
+        mut userop: PackedUserOperation,
+    ) -> Result<FixedBytes<32>, Box<dyn StdError>> {
         let ep: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
         let contract = EntryPoint::new(ep, self.provider.as_ref().unwrap());
 
@@ -137,8 +112,6 @@ impl<'a> BaseAccount for SmartAccount<'a> {
 
         println!("{:?}", tx_hash);
 
-        Ok(())
+        Ok(tx_hash)
     }
-
 }
-

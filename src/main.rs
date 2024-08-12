@@ -1,8 +1,11 @@
 mod account;
+mod accounts;
 mod config;
 mod erc4337;
 mod execution;
+mod types;
 use crate::account::{BaseAccount, SmartAccount};
+// use crate::accounts::umsa::{AccountEnvironment, AccountEnvironmentHelper};
 use crate::config::{parse_config, Config};
 use crate::erc4337::{Execution, PackedUserOperation};
 use crate::execution::ExecutionHelper;
@@ -10,12 +13,12 @@ use alloy::network::EthereumWallet;
 use alloy::primitives::{address, bytes, U256};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::transports::http::reqwest::Url;
+use alloy::{node_bindings::Anvil, providers::ProviderBuilder};
 use clap::Parser;
 use std::error::Error as StdError;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::{fs, str::FromStr};
-use alloy::{node_bindings::Anvil,  providers::ProviderBuilder };
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -25,6 +28,8 @@ struct Args {
     config: PathBuf,
     #[arg(short, long)]
     private_key: String,
+    // #[arg(short, long)]
+    // deploy: bool,
 }
 
 #[tokio::main]
@@ -48,6 +53,7 @@ async fn run(config: Config, priv_key: String) -> Result<(), Box<dyn StdError>> 
 
     println!("Hello LazyAccount");
 
+    // let account_env  = AccountEnvironment::new(Arc::new(provider.clone())).await?;
 
     let account = SmartAccount::new().with_provider(Arc::new(provider));
     // let account = SmartAccount::new().with_url(url?, &wallet);
