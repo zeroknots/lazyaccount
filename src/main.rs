@@ -11,7 +11,7 @@ use crate::config::{parse_config, Config};
 use crate::erc4337::{Execution, PackedUserOperation};
 use crate::execution::ExecutionHelper;
 use alloy::network::EthereumWallet;
-use alloy::primitives::{address, bytes, b256, U256};
+use alloy::primitives::{address, b256, Bytes, bytes, U256};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::transports::http::reqwest::Url;
 use alloy::{node_bindings::Anvil, providers::ProviderBuilder};
@@ -53,30 +53,31 @@ async fn run(config: Config, priv_key: String) -> Result<(), Box<dyn StdError>> 
 
     println!("Hello LazyAccount");
 
-    // let account_env  = AccountEnvironment::new(Arc::new(provider.clone())).await?;
-
     let account = SmartAccount::new().with_provider(provider_arc.clone());
-    // let account = SmartAccount::new().with_url(url?, &wallet);
-    //
 
-    let salt = b256!("4141414141414141414141414141414141414141414141414141414141414141");
-    let owners = vec![address!("4141414141414141414141414141414141414141")];
-    let validator = address!("4141414141414141414141414141414141414141");
 
-    let (init_code, address) = <Safe7579HelperImpl as Safe7579Helper>::make_account(provider_arc.clone(), salt, owners, validator).await?;
+    let (init_code, account_address) = <Safe7579HelperImpl as Safe7579Helper>::make_account(
+        provider_arc.clone(),
+        config.general.account_salt,
+        config.general.owners,
+        config.general.validator_modules.clone(),
+    )
+    .await?;
 
-    println!("init_code: {:?}", init_code);
-    println!("address: {:?}", address);
+    if let Some(_address) = config.general.account_address {
+        if _address != account_address {
+            panic!("Address mismatch");
+        }
+    }
 
-    let account_address = address!("70997970C51812dc3A010C7d01b50e0d17dc79C8");
-    let validator = address!("fB43116489394D843B2B29a7F6aa3eC0d590d795");
 
-    let nonce = account.get_nonce(validator).await?;
+    let default_validator = config.general.validator_modules[0];
+    let nonce = account.get_nonce(default_validator).await?;
 
     let execution = account.encode_execution(vec![Execution {
-        target: validator,
-        value: U256::ZERO,
-        callData: bytes!("4141"),
+        target: account_address,
+        value: U256::from(100),
+        callData: Bytes::from(""),
     }]);
 
     let userop = PackedUserOperation::new()

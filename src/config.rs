@@ -1,3 +1,4 @@
+use alloy::primitives::{Address, FixedBytes};
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
@@ -9,10 +10,11 @@ pub struct Config {
 }
 #[derive(Deserialize, Debug)]
 pub struct GeneralConfig {
-    pub account_address: Option<String>,
-    pub validator_modules: Vec<String>,
+    pub account_address: Option<Address>,
+    pub validator_modules: Vec<Address>,
+    pub account_salt: FixedBytes<32>,
+    pub owners: Vec<Address>,
 }
-
 
 pub fn parse_config(file_path: PathBuf) -> Result<Config, Box<dyn std::error::Error>> {
     // Read the contents of the file
