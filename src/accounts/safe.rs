@@ -28,7 +28,7 @@ sol!(
     Safe7579Launchpad,
     "src/artifacts/safe7579Launchpad.json"
 );
-pub const SAFE7579LAUNCHPAD_ADDR: Address = address!("7579F9feedf32331C645828139aFF78d517d0001");
+pub const SAFE7579LAUNCHPAD_ADDR: Address = address!("75796e975bD270d487Be50b4e9797780360400ff");
 
 sol!(
     #[derive(Debug)]
@@ -64,6 +64,12 @@ sol! {
     }
 }
 
+
+pub const EMPTY_MODULE_INIT: Safe7579Launchpad::ModuleInit = Safe7579Launchpad::ModuleInit {
+    module: Address::ZERO,
+    initData: bytes!(""),
+};
+
 #[async_trait]
 pub trait Safe7579Helper<'a> {
     async fn make_account(
@@ -74,7 +80,7 @@ pub trait Safe7579Helper<'a> {
     )-> Result<(Bytes, Address), Box<dyn StdError>>;
 }
 
-struct Safe7579HelperImpl;
+pub struct Safe7579HelperImpl;
 
 #[async_trait]
 impl<'a> Safe7579Helper<'a> for Safe7579HelperImpl {
@@ -88,16 +94,12 @@ impl<'a> Safe7579Helper<'a> for Safe7579HelperImpl {
             module: validator,
             initData: Bytes::from(""),
         };
-        let empty_init = Safe7579Launchpad::ModuleInit {
-            module: Address::ZERO,
-            initData: Bytes::from(""),
-        };
 
         let safe_setup_call = Safe7579Launchpad::initSafe7579Call {
             safe7579: SAFE7579_ADDR,
-            executors: vec![empty_init.clone()],
-            fallbacks: vec![empty_init.clone()],
-            hooks: vec![empty_init.clone()],
+            executors: vec![EMPTY_MODULE_INIT],
+            fallbacks: vec![EMPTY_MODULE_INIT],
+            hooks: vec![EMPTY_MODULE_INIT],
             attesters: owners.clone(),
             threshold: 1,
         };
@@ -120,7 +122,7 @@ impl<'a> Safe7579Helper<'a> for Safe7579HelperImpl {
             .hash(launchpad_init_call.clone())
             .call()
             .await
-            .unwrap();
+            .unwrap_or_else(|_| panic!("Failed to get hash"));
 
         let factory_initializer = Safe7579Launchpad::preValidationSetupCall {
             initHash,
@@ -149,7 +151,7 @@ impl<'a> Safe7579Helper<'a> for Safe7579HelperImpl {
             )
             .call()
             .await
-            .unwrap();
+            .unwrap_or_else(|_| panic!("Failed to predict safe address"));
 
 
         Ok((

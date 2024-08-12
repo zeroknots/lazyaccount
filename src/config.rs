@@ -9,12 +9,10 @@ pub struct Config {
 }
 #[derive(Deserialize, Debug)]
 pub struct GeneralConfig {
-    pub account_address: String,
-    pub account_type: String,
+    pub account_address: Option<String>,
     pub validator_modules: Vec<String>,
 }
 
-// TODO: implement proper serde
 
 pub fn parse_config(file_path: PathBuf) -> Result<Config, Box<dyn std::error::Error>> {
     // Read the contents of the file

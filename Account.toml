@@ -1,4 +1,4 @@
 [general]
-account_address = "0x90b99196a9615203b7196eBceEEd25c0bd72021c"
+account_address = 
 account_type = "Safe7579"
 validator_modules = ["0x53B2150d3353881D43609190C5071E44d965Cc55"]
