@@ -12,7 +12,7 @@ pub type HttpProvider<'a> = alloy::providers::fillers::FillProvider<
     alloy::transports::http::Http<alloy::transports::http::Client>,
     alloy::network::Ethereum,
 >;
-pub type RootProviderType<'a> =
+pub type RootProviderType =
     alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>;
 
 pub type Foo<'a> = FillProvider<

@@ -1,8 +1,5 @@
-use crate::account::SmartAccount;
 use alloy::primitives::{address, b256, Address, Bytes, FixedBytes, B256, U256};
 use alloy::sol;
-use async_trait::async_trait;
-use std::error::Error as StdError;
 
 sol! {
     #[derive(Debug, PartialEq, Eq)]
@@ -11,7 +8,6 @@ sol! {
     type ExecType is bytes1;
     type ModeSelector is bytes4;
     type ModePayload is bytes22;
-
 
     #[derive(Debug, PartialEq, Eq)]
     struct Execution {
@@ -50,7 +46,7 @@ sol! {
     }
 }
 
-const ENTRYPOINT_ADDR: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
+pub const ENTRYPOINT_ADDR: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
 
 pub const SINGLE_EXECUTION_MODE: ModeCode = ModeCode(FixedBytes([0x00; 32]));
 pub const BATCH_EXECUTION_MODE: ModeCode = ModeCode({
@@ -67,10 +63,10 @@ impl PackedUserOperation {
             initCode: Bytes::default(),
             callData: Bytes::default(),
             accountGasLimits: b256!(
-                "0000000000000000000000000000000000000000000000000000000000000010"
+                "0000000000000000000000000000000000000000000000000000100000000000"
             ),
-            preVerificationGas: U256::from(100000),
-            gasFees: b256!("0000000000000000000000000000000000000000000000000000000000000010"),
+            preVerificationGas: U256::from(1000000000000u64),
+            gasFees: b256!("0000000000000000000000000000000000000000000000001000000000000000"),
             paymasterAndData: Bytes::default(),
             signature: Bytes::default(),
         }

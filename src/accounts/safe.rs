@@ -70,25 +70,123 @@ pub const EMPTY_MODULE_INIT: Safe7579Launchpad::ModuleInit = Safe7579Launchpad::
 };
 
 #[async_trait]
-pub trait Safe7579Helper<'a> {
+pub trait Safe7579Helper {
     async fn make_account(
-        provider: Arc<RootProviderType<'a>>,
+        provider: Arc<RootProviderType>,
         salt: B256,
         owners: Vec<Address>,
         validator: Vec<Address>,
     ) -> Result<(Bytes, Address), Box<dyn StdError>>;
 }
 
+#[derive(Debug)]
+pub struct Safe7579HelperData {
+    pub proxy_call: Bytes,
+    pub factory_initializer: Bytes,
+}
+
 pub struct Safe7579HelperImpl;
 
 #[async_trait]
-impl<'a> Safe7579Helper<'a> for Safe7579HelperImpl {
+impl Safe7579Helper for Safe7579HelperImpl {
     async fn make_account(
-        provider: Arc<RootProviderType<'a>>,
+        provider: Arc<RootProviderType>,
         salt: B256,
         owners: Vec<Address>,
         validators: Vec<Address>,
     ) -> Result<(Bytes, Address), Box<dyn StdError>> {
+        // let validators_init: Vec<Safe7579Launchpad::ModuleInit> = validators
+        //     .into_iter()
+        //     .map(|validator| Safe7579Launchpad::ModuleInit {
+        //         module: validator,
+        //         initData: Bytes::from(""),
+        //     })
+        //     .collect();
+
+        // let safe_setup_call: Bytes = Safe7579Launchpad::initSafe7579Call {
+        //     safe7579: SAFE7579_ADDR,
+        //     executors: vec![EMPTY_MODULE_INIT],
+        //     fallbacks: vec![EMPTY_MODULE_INIT],
+        //     hooks: vec![EMPTY_MODULE_INIT],
+        //     attesters: owners.clone(),
+        //     threshold: 1,
+        // }
+        // .abi_encode()
+        // .into();
+
+        // let launchpad_init_call = Safe7579Launchpad::InitData {
+        //     singleton: SAFE_IMPL_ADDR,
+        //     owners,
+        //     threshold: U256::from(1),
+        //     setupTo: SAFE7579LAUNCHPAD_ADDR,
+        //     setupData: safe_setup_call,
+        //     safe7579: SAFE7579_ADDR,
+        //     validators: validators_init,
+        //     callData: Bytes::from(""),
+        // };
+
+        // let safe7579_launchpad = Safe7579Launchpad::new(SAFE7579LAUNCHPAD_ADDR, provider);
+
+        // let Safe7579Launchpad::hashReturn { initHash } = safe7579_launchpad
+        //     .hash(launchpad_init_call.clone())
+        //     .call()
+        //     .await?;
+
+        // println!(" Init hash {:?}", initHash);
+
+        // let factory_initializer_bytes: Bytes = Safe7579Launchpad::preValidationSetupCall {
+        //     initHash,
+        //     to: Address::ZERO,
+        //     preInit: Bytes::from(""),
+        // }
+        // .abi_encode()
+        // .into();
+
+        // let proxy_call = SafeProxyFactory::createProxyWithNonceCall {
+        //     _singleton: SAFE7579LAUNCHPAD_ADDR,
+        //     initializer: factory_initializer_bytes.clone(),
+        //     saltNonce: salt.into(),
+        // }
+        // .abi_encode();
+
+        let Safe7579HelperData {
+            proxy_call,
+            factory_initializer,
+        } = Safe7579HelperImpl::make_factory_data(provider.clone(), salt, owners, validators)
+            .await?;
+
+        let safe7579_launchpad = Safe7579Launchpad::new(SAFE7579LAUNCHPAD_ADDR, provider);
+
+        let safe_proxy_bytecode = &SafeProxy::BYTECODE;
+        let Safe7579Launchpad::predictSafeAddressReturn { safeProxy } = safe7579_launchpad
+            .predictSafeAddress(
+                SAFE7579LAUNCHPAD_ADDR,
+                SAFE_PROXY_FACTORY,
+                safe_proxy_bytecode.clone(),
+                salt.into(),
+                factory_initializer,
+            )
+            .call()
+            .await?;
+
+        println!("Predicted Account {:?}", safeProxy);
+        Ok((
+            Bytes::from(PackedFactoryCall::abi_encode(&PackedFactoryCall {
+                factory: SAFE_PROXY_FACTORY,
+                data: proxy_call,
+            })),
+            safeProxy,
+        ))
+    }
+}
+
+impl Safe7579HelperImpl {
+    pub async fn make_factory_data(
+        provider: Arc<RootProviderType>,
+        salt: B256,
+        owners: Vec<Address>,
+        validators: Vec<Address>,
+    ) -> Result<Safe7579HelperData, Box<dyn StdError>> {
         let validators_init: Vec<Safe7579Launchpad::ModuleInit> = validators
             .into_iter()
             .map(|validator| Safe7579Launchpad::ModuleInit {
@@ -97,72 +195,54 @@ impl<'a> Safe7579Helper<'a> for Safe7579HelperImpl {
             })
             .collect();
 
-        let safe_setup_call = Safe7579Launchpad::initSafe7579Call {
+        let safe_setup_call: Bytes = Safe7579Launchpad::initSafe7579Call {
             safe7579: SAFE7579_ADDR,
             executors: vec![EMPTY_MODULE_INIT],
             fallbacks: vec![EMPTY_MODULE_INIT],
             hooks: vec![EMPTY_MODULE_INIT],
             attesters: owners.clone(),
             threshold: 1,
-        };
+        }
+        .abi_encode()
+        .into();
 
         let launchpad_init_call = Safe7579Launchpad::InitData {
             singleton: SAFE_IMPL_ADDR,
             owners,
             threshold: U256::from(1),
             setupTo: SAFE7579LAUNCHPAD_ADDR,
-            setupData: Bytes::from(Safe7579Launchpad::initSafe7579Call::abi_encode(
-                &safe_setup_call,
-            )),
+            setupData: safe_setup_call,
             safe7579: SAFE7579_ADDR,
             validators: validators_init,
             callData: Bytes::from(""),
         };
 
         let safe7579_launchpad = Safe7579Launchpad::new(SAFE7579LAUNCHPAD_ADDR, provider);
+
         let Safe7579Launchpad::hashReturn { initHash } = safe7579_launchpad
             .hash(launchpad_init_call.clone())
             .call()
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get hash"));
+            .await?;
 
-        let factory_initializer = Safe7579Launchpad::preValidationSetupCall {
+        let factory_initializer_bytes: Bytes = Safe7579Launchpad::preValidationSetupCall {
             initHash,
             to: Address::ZERO,
             preInit: Bytes::from(""),
-        };
-
-        let factory_initializer_bytes = Bytes::from(
-            Safe7579Launchpad::preValidationSetupCall::abi_encode(&factory_initializer),
-        );
+        }
+        .abi_encode()
+        .into();
 
         let proxy_call = SafeProxyFactory::createProxyWithNonceCall {
             _singleton: SAFE7579LAUNCHPAD_ADDR,
             initializer: factory_initializer_bytes.clone(),
             saltNonce: salt.into(),
-        };
+        }
+        .abi_encode()
+        .into();
 
-        let safeproxy_bytecode = &SafeProxy::BYTECODE;
-        let Safe7579Launchpad::predictSafeAddressReturn { safeProxy } = safe7579_launchpad
-            .predictSafeAddress(
-                SAFE7579LAUNCHPAD_ADDR,
-                SAFE_PROXY_FACTORY,
-                safeproxy_bytecode.clone(),
-                salt.into(),
-                factory_initializer_bytes,
-            )
-            .call()
-            .await
-            .unwrap_or_else(|_| panic!("Failed to predict safe address"));
-
-        Ok((
-            Bytes::from(PackedFactoryCall::abi_encode(&PackedFactoryCall {
-                factory: SAFE_PROXY_FACTORY,
-                data: Bytes::from(SafeProxyFactory::createProxyWithNonceCall::abi_encode(
-                    &proxy_call,
-                )),
-            })),
-            safeProxy,
-        ))
+        Ok(Safe7579HelperData {
+            proxy_call,
+            factory_initializer: factory_initializer_bytes,
+        })
     }
 }
