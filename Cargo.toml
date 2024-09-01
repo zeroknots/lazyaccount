@@ -18,3 +18,4 @@ async-trait = "0.1.81"
 eyre = "0.6.12"
 thiserror = "1.0.63"
 directories = "5.0.1"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"]}

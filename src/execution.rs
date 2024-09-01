@@ -1,57 +1,35 @@
-// use alloy_contract::SolCallBuilder;
-// use alloy_primitives::{address, keccak256, Address, FixedBytes, Bytes, b256, B256, U256};
-// use alloy_provider::Provider;
-// use alloy_sol_types::{sol_data::*, SolInterface};
-// use alloy_sol_types::{abi, sol};
-// use alloy_sol_types::{sol_data::*, SolValue};
-// use alloy_sol_types::SolCall;
-//
-// use alloy_provider::network;
-use crate::account::SmartAccount;
 use crate::erc4337::{
-    ERC7579Account, Execution, ModeCode, BATCH_EXECUTION_MODE, SINGLE_EXECUTION_MODE,
+    create_default_packed_user_operation, get_nonce, ERC7579Account, Execution, ModeCode,
+    BATCH_EXECUTION_MODE, SINGLE_EXECUTION_MODE,
 };
-use alloy::contract::SolCallBuilder;
-use alloy::network::{Ethereum, EthereumWallet};
-use alloy::primitives::{address, Address, Bytes, U256};
-use alloy::providers::ProviderBuilder;
-use alloy::sol;
-use alloy::sol_types::{abi, sol_data::*, sol_data::*, SolCall, SolInterface, SolValue};
-use alloy::transports::http::reqwest::Url;
-use async_trait::async_trait;
-use serde::Deserialize;
-use std::error::Error as StdError;
-use std::sync::Arc;
+use crate::smart_account::RootProviderType;
+use alloy::primitives::{Address, Bytes};
+use alloy::rpc::types::SendUserOperation;
+use alloy::sol_types::{SolCall, SolValue};
 
-pub trait ExecutionHelper {
-    fn encode_execution(&self, executions: Vec<Execution>) -> Bytes;
-    fn install_module(
-        &self,
-        module_type: Vec<U256>,
-        module: Address,
-        init_data: Bytes,
-    ) -> ERC7579Account::ERC7579AccountCalls;
+trait EncodeExecution {
+    fn encode_execution(self) -> Bytes;
 }
 
-impl<'a> ExecutionHelper for SmartAccount<'a> {
-    fn encode_execution(&self, executions: Vec<Execution>) -> Bytes {
+impl EncodeExecution for Vec<Execution> {
+    fn encode_execution(self) -> Bytes {
         let mode: ModeCode;
         let mut result: Vec<u8> = Vec::new();
 
-        match executions.len() {
+        match self.len() {
             0 => {
                 panic!("No executions to encode")
             }
             1 => {
-                let tmp = Execution::abi_encode_packed(&executions[0]);
-                result.extend(tmp);
                 mode = SINGLE_EXECUTION_MODE;
+                let execution_data = Execution::abi_encode_packed(&self[0]);
+                result.extend(execution_data.into_iter());
             }
             _ => {
                 mode = BATCH_EXECUTION_MODE;
-                for execution in executions {
-                    let tmp = Execution::abi_encode(&execution);
-                    result.extend(tmp);
+                for execution in self {
+                    let execution_data = Execution::abi_encode(&execution);
+                    result.extend(execution_data);
                 }
             }
         }
@@ -62,27 +40,29 @@ impl<'a> ExecutionHelper for SmartAccount<'a> {
         };
         Bytes::from(calldata.abi_encode())
     }
+}
 
-    fn install_module(
-        &self,
-        module_type: Vec<U256>,
-        module: Address,
-        init_data: Bytes,
-    ) -> ERC7579Account::ERC7579AccountCalls {
-        match module_type.len() {
-            0 => {
-                panic!("No module type to encode")
-            }
-            1 => ERC7579Account::ERC7579AccountCalls::installModule(
-                ERC7579Account::installModuleCall {
-                    moduleTypeId: module_type[0],
-                    module,
-                    initData: init_data,
-                },
-            ),
-            _ => {
-                panic!("Multiple module types not supported")
-            }
-        }
-    }
+pub async fn prepare_user_operation(
+    provider: &RootProviderType,
+    entry_point: &Address,
+    validator_module: &Address,
+    sender: &Address,
+    executions: Vec<Execution>,
+    // _signature: Bytes, // TODO mostly the signature would also be required
+) -> eyre::Result<SendUserOperation> {
+    // TODO verify that all necessary steps required for the correct execution where done
+
+    let mut packed_operation = create_default_packed_user_operation();
+
+    packed_operation.nonce = get_nonce(
+        provider,
+        entry_point.clone(),
+        validator_module.clone(),
+        sender.clone(),
+    )
+    .await?;
+    packed_operation.sender = sender.clone();
+    packed_operation.call_data = executions.encode_execution();
+
+    Ok(SendUserOperation::EntryPointV07(packed_operation))
 }

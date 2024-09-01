@@ -1,4 +1,7 @@
-use alloy::primitives::{address, b256, Address, Bytes, FixedBytes, B256, U256};
+use crate::smart_account::RootProviderType;
+use alloy::primitives::aliases::U192;
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
+use alloy::rpc::types::PackedUserOperation;
 use alloy::sol;
 
 sol! {
@@ -26,27 +29,31 @@ sol! {
 }
 
 sol! {
-    #[derive(Debug)]
-    struct PackedUserOperation {
-        address sender;
-        uint256 nonce;
-        bytes initCode;
-        bytes callData;
-        bytes32 accountGasLimits;
-        uint256 preVerificationGas;
-        bytes32 gasFees;
-        bytes paymasterAndData;
-        bytes signature;
-    }
-
     #[sol(rpc)]
     contract EntryPoint {
-        function handleOps(PackedUserOperation[] calldata ops, address payable beneficiary) external;
         function getNonce(address sender, uint192 key) external view returns (uint256 nonce);
     }
 }
 
-pub const ENTRYPOINT_ADDR: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
+pub async fn get_nonce(
+    provider: &RootProviderType,
+    entry_point: Address,
+    validator_module: Address,
+    sender: Address,
+) -> eyre::Result<U256> {
+    let mut key_bytes = [0u8; 24];
+    key_bytes[4..24].copy_from_slice(&validator_module.as_slice());
+    let key = U192::from_be_bytes(key_bytes);
+
+    let key = key & U192::MAX;
+    let contract = EntryPoint::new(entry_point, provider.clone());
+    let EntryPoint::getNonceReturn { nonce } = contract.getNonce(sender, key).call().await?;
+
+    println!("Nonce: {:?}", nonce);
+
+    let nonce = U256::from(0);
+    Ok(nonce)
+}
 
 pub const SINGLE_EXECUTION_MODE: ModeCode = ModeCode(FixedBytes([0x00; 32]));
 pub const BATCH_EXECUTION_MODE: ModeCode = ModeCode({
@@ -55,57 +62,22 @@ pub const BATCH_EXECUTION_MODE: ModeCode = ModeCode({
     FixedBytes(bytes)
 });
 
-impl PackedUserOperation {
-    pub fn new() -> PackedUserOperation {
-        PackedUserOperation {
-            sender: Address::default(),
-            nonce: U256::from(0),
-            initCode: Bytes::default(),
-            callData: Bytes::default(),
-            accountGasLimits: b256!(
-                "0000000000000000000000000000000000000000000000000000100000000000"
-            ),
-            preVerificationGas: U256::from(1000000000000u64),
-            gasFees: b256!("0000000000000000000000000000000000000000000000001000000000000000"),
-            paymasterAndData: Bytes::default(),
-            signature: Bytes::default(),
-        }
-    }
-    pub fn with_sender(mut self, sender: Address) -> Self {
-        self.sender = sender;
-        self
-    }
-
-    pub fn with_nonce(mut self, nonce: U256) -> Self {
-        self.nonce = nonce;
-        self
-    }
-    pub fn with_init_code(mut self, init_code: Bytes) -> Self {
-        self.initCode = init_code;
-        self
-    }
-    pub fn with_calldata(mut self, callData: Bytes) -> Self {
-        self.callData = callData;
-        self
-    }
-    pub fn with_account_gas_limits(mut self, account_gas_limits: B256) -> Self {
-        self.accountGasLimits = account_gas_limits;
-        self
-    }
-    pub fn with_pre_verification_gas(mut self, pre_verification_gas: U256) -> Self {
-        self.preVerificationGas = pre_verification_gas;
-        self
-    }
-    pub fn with_gas_fees(mut self, gas_fees: B256) -> Self {
-        self.gasFees = gas_fees;
-        self
-    }
-    pub fn with_paymaster_and_data(mut self, paymaster_and_data: Bytes) -> Self {
-        self.paymasterAndData = paymaster_and_data;
-        self
-    }
-    pub fn with_signature(mut self, signature: Bytes) -> Self {
-        self.signature = signature;
-        self
+pub fn create_default_packed_user_operation() -> PackedUserOperation {
+    PackedUserOperation {
+        sender: Address::ZERO,
+        nonce: U256::from(0),
+        factory: Address::ZERO,
+        factory_data: Bytes::default(),
+        call_data: Bytes::default(),
+        call_gas_limit: U256::from(10000000u64),
+        verification_gas_limit: U256::from(10000000u64),
+        pre_verification_gas: U256::from(10000000u64),
+        max_fee_per_gas: U256::from(10000u64),
+        max_priority_fee_per_gas: U256::from(10000u64),
+        paymaster: Address::ZERO,
+        paymaster_verification_gas_limit: U256::from(10000000u64),
+        paymaster_post_op_gas_limit: U256::from(10000000u64),
+        paymaster_data: Bytes::default(),
+        signature: Bytes::default(),
     }
 }
