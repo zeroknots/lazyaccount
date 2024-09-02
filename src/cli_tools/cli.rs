@@ -11,16 +11,12 @@ pub struct Cli {
     #[arg(short, long, default_value = "default")]
     pub profile: String,
 
-    /// Path to the transaction signer's private key
-    #[arg(short, long)]
-    pub signer_key_file: Option<PathBuf>,
-
     /// URL of the RPC node
     #[arg(short, long)]
     pub rpc_node_url: Option<String>,
 
     /// URL of the bundler RPC
-    #[arg(short, long)]
+    #[arg(long)]
     pub rpc_bundler_url: Option<String>,
 
     /// Address of the entrypoint contract
