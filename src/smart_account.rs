@@ -1,7 +1,9 @@
+use crate::execution::{BuildUserOp, Erc4337Nonce, UserOpsBuilder};
 use crate::{
     account_builder::AccountBuilder, cli_tools::setup_config::Config, erc4337::Execution,
     execution::prepare_user_operation, module_ops::ModuleAction,
 };
+use alloy::primitives::{Bytes, U256};
 use alloy::{primitives::Address, rpc::types::SendUserOperation};
 use alloy_provider::{ext::Erc4337Api, ProviderBuilder};
 use url::Url;
@@ -51,21 +53,37 @@ impl SmartAccount {
 
     pub async fn execute_operation(
         &self,
-        sender: &Address,
-        validator_module: &Address,
-        execution: Vec<Execution>,
+        sender: Address,
+        validator_module: Address,
+        mut execution: Vec<(Address, U256, Bytes)>,
     ) -> eyre::Result<()> {
-        let user_operations: SendUserOperation = prepare_user_operation(
-            &self.rpc_node_provider,
-            &self.entry_point,
+        let mut builder = if let Some((target, value, call_data)) = execution.pop() {
+            UserOpsBuilder::new().add_execution(target, value, call_data)
+        } else {
+            eyre::bail!("Nothing to execute");
+        };
+
+        let mut nonce = Erc4337Nonce::new(
+            self.rpc_node_provider.clone(),
+            self.entry_point,
             validator_module,
             sender,
-            execution,
-        )
-        .await?;
+        );
+
+        let op = if let Some((target, value, call_data)) = execution.pop() {
+            let mut builder = builder.add_execution(target, value, call_data);
+
+            while let Some((target, value, call_data)) = execution.pop() {
+                builder = builder.add_execution(target, value, call_data);
+            }
+
+            builder.build(sender, &mut nonce).await
+        } else {
+            builder.build(sender, &mut nonce).await
+        }?;
 
         self.rpc_bundler_provider
-            .send_user_operation(user_operations, self.entry_point.clone())
+            .send_user_operation(op, self.entry_point.clone())
             .await?;
 
         Ok(())
