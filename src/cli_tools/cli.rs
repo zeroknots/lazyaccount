@@ -1,6 +1,11 @@
 use crate::{account_builder::AccountType, module_ops::ModuleAction};
+use alloy::hex::FromHexError;
+use alloy::primitives::hex::FromHex;
+use alloy::primitives::ruint::aliases::U256;
 use alloy::primitives::Address;
+use alloy::primitives::Bytes;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 #[derive(clap::Parser, Clone, Debug)]
 pub struct Cli {
@@ -33,18 +38,7 @@ pub enum Command {
         data_path: PathBuf,
     },
 
-    ExecuteOperation {
-        #[arg(value_enum, short, long)]
-        sender: Address,
-        #[arg(value_enum, short, long)]
-        validator_module: Address,
-        #[arg(value_enum, short, long)]
-        target: Address,
-        #[arg(short, long)]
-        value: String,
-        #[arg(short, long)]
-        calldata: String,
-    },
+    ExecuteOperation(ExecuteOperationParams),
 
     ModuleOperation {
         #[arg(value_enum, short, long)]
@@ -55,6 +49,37 @@ pub enum Command {
 
     #[command(subcommand)]
     Config(ConfigSubcommand),
+}
+
+#[derive(Debug, Clone)]
+pub struct HexEncodedBytes(Bytes);
+
+impl HexEncodedBytes {
+    pub fn into_inner(self) -> Bytes {
+        self.0
+    }
+}
+
+impl FromStr for HexEncodedBytes {
+    type Err = FromHexError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Bytes::from_hex(s).map(HexEncodedBytes)
+    }
+}
+
+#[derive(clap::Args, Clone, Debug)]
+pub struct ExecuteOperationParams {
+    #[arg(long)]
+    pub sender: Address,
+    #[arg(long)]
+    pub validator_module: Address,
+    #[arg(long, required(true))]
+    pub target: Vec<Address>,
+    #[arg(long, required(true))]
+    pub value: Vec<U256>,
+    #[arg(long, required(true))]
+    pub calldata: Vec<HexEncodedBytes>,
 }
 
 #[derive(clap::Subcommand, Clone, Debug)]

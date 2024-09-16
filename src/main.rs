@@ -42,30 +42,22 @@ async fn main() -> eyre::Result<()> {
 
             smart_account.create_account(builder).await?;
         }
-        Command::ExecuteOperation {
-            // TODO add support for BATCH_EXECUTION mode
-            sender,
-            validator_module,
-            target,
-            value,
-            calldata,
-        } => {
+        Command::ExecuteOperation(e) => {
             let config = Config::new(&cli)?;
-
             let smart_account = SmartAccount::new(config)?;
 
-            let value = U256::try_from_be_slice(&hex::decode(value)?)
-                .ok_or(AppError::ExecutionValueOverflow)?;
-            let calldata = Bytes::from_hex(calldata)?;
-
-            let execution = Execution {
-                target: target.clone(),
-                value,
-                callData: calldata,
-            };
+            let executions = e
+                .target
+                .iter()
+                .zip(e.value.iter())
+                .zip(e.calldata.iter())
+                .map(|((&target, &value), call_data)| {
+                    (target, value, call_data.clone().into_inner())
+                })
+                .collect();
 
             smart_account
-                .execute_operation(sender, validator_module, vec![execution])
+                .execute_operation(e.sender, e.validator_module, executions)
                 .await?;
         }
         Command::ModuleOperation {
