@@ -1,4 +1,3 @@
-use crate::accounts::UserOpsBuilder;
 use alloy::primitives::aliases::U192;
 use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::sol;

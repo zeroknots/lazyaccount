@@ -25,7 +25,7 @@ async fn main() -> eyre::Result<()> {
     let bundler = ProviderBuilder::new().on_http(bundler_url);
 
     let account = provider
-        .connect(Some(account_address), AccountType::Nexus, Box::new(bundler))
+        .connect(Some(account_address), AccountType::Nexus, Box::new(bundler), Box::new(provider.clone()))
         .await?;
     println!("{:?}", account);
 
