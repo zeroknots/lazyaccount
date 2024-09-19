@@ -17,7 +17,6 @@ pub enum AccountType {
 impl AccountType {
     pub fn create_account_builder(
         &self,
-        data_path: &PathBuf,
     ) -> eyre::Result<Box<dyn AccountBuilder>> {
         let file = File::open(data_path)?;
         let reader = BufReader::new(file);

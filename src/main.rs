@@ -1,78 +1,38 @@
-use alloy::{
-    hex::{self, FromHex},
-    primitives::{Bytes, U256},
-};
-use clap::Parser;
-use cli_tools::{
-    cli::{Cli, Command},
-    setup_config::{self, Config},
-};
-use erc4337::Execution;
-use error::AppError;
-use smart_account::SmartAccount;
-
-mod account_builder;
 mod accounts;
-mod cli_tools;
 mod erc4337;
-mod error;
-mod execution;
-mod module_ops;
-mod smart_account;
+mod erc7579;
+use accounts::{AccountType, SmartAccountBuilder};
+use alloy_provider::{ext::Erc4337Api, ProviderBuilder, RootProvider};
+use url::Url;
+
+use alloy::primitives::address;
+
+use alloy::providers::Provider;
+use alloy::transports::http::{Client, Http};
+
+pub type RootProviderType =
+    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+    let rpc_url = Url::parse("http://localhost:8545")?;
+    let bundler_url = Url::parse("http://localhost:4337")?;
 
-    let cli = Cli::parse();
+    let account_address = address!("c2b17e73603dccc195118a36f3203134fd7985f5");
+    let validator_address = address!("503b54Ed1E62365F0c9e4caF1479623b08acbe77");
 
-    match &cli.command {
-        Command::Config(cmd) => setup_config::run_config_command(&cli, cmd)?,
-        Command::CreateAccount {
-            account_type,
-            data_path,
-        } => {
-            let config = Config::new(&cli)?;
+    let provider = ProviderBuilder::new().on_http(rpc_url);
+    let bundler = ProviderBuilder::new().on_http(bundler_url);
 
-            let smart_account = SmartAccount::new(config)?;
+    let account = provider
+        .connect(Some(account_address), AccountType::Nexus, Box::new(bundler))
+        .await?;
+    println!("{:?}", account);
 
-            let builder = account_type.create_account_builder(data_path)?;
-
-            smart_account.create_account(builder).await?;
-        }
-        Command::ExecuteOperation(e) => {
-            let config = Config::new(&cli)?;
-            let smart_account = SmartAccount::new(config)?;
-
-            let executions = e
-                .target
-                .iter()
-                .zip(e.value.iter())
-                .zip(e.calldata.iter())
-                .map(|((&target, &value), call_data)| {
-                    (target, value, call_data.clone().into_inner())
-                })
-                .collect();
-
-            smart_account
-                .execute_operation(e.sender, e.validator_module, executions)
-                .await?;
-        }
-        Command::ModuleOperation {
-            sender,
-            module_action,
-        } => {
-            let config = Config::new(&cli)?;
-
-            let smart_account = SmartAccount::new(config)?;
-
-            smart_account
-                .execute_module_operation(sender, module_action)
-                .await?;
-        }
-    };
+    // let builder = account_type.create_builder::<RootProvider<Http<Client>>>()?;
+    //
+    //
+    // let user_op =prepare_user_operation(account_address, validator_address).await?;
 
     Ok(())
 }
