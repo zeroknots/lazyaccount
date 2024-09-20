@@ -44,20 +44,18 @@ impl ExecutionBuilder for Vec<Execution> {
     fn encode_executions(self) -> Bytes {
         match self.len() {
             1 => {
-                let mode: ModeCode = SINGLE_EXECUTION_MODE;
-                let mut result: Vec<u8> = Vec::new();
+                let mode = SINGLE_EXECUTION_MODE;
                 let execution_data = Execution::abi_encode_packed(&self[0]);
-                result.extend(execution_data.into_iter());
 
                 let calldata = ERC7579Account::executeCall {
                     mode: mode.into(),
-                    executionCalldata: result.into(),
+                    executionCalldata: execution_data.into(),
                 };
                 Bytes::from(calldata.abi_encode())
             }
             _ => {
-                let mode: ModeCode = BATCH_EXECUTION_MODE;
-                let mut result: Vec<u8> = Vec::new();
+                let mode = BATCH_EXECUTION_MODE;
+                let mut result = Vec::new();
                 for execution in self {
                     let execution_data = Execution::abi_encode(&execution);
                     result.extend(execution_data);

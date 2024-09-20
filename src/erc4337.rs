@@ -12,7 +12,7 @@ sol! {
         function getNonce(address sender, uint192 key) external view returns (uint256 nonce);
     }
 }
-const ENTRYPOINT: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
+pub(crate) const ENTRYPOINT: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
 
 pub trait EntryPointApi<N, T>: Send + Sync {
     async fn get_nonce(&self, sender: Address, key: U192) -> eyre::Result<U256>;
@@ -45,18 +45,18 @@ impl PackedUserOperationBuilder for PackedUserOperation {
         PackedUserOperation {
             sender: Address::ZERO,
             nonce: U256::from(0),
-            factory: Address::ZERO,
-            factory_data: Bytes::default(),
+            factory: None,
+            factory_data: None,
             call_data: Bytes::default(),
             call_gas_limit: U256::from(10000000u64),
             verification_gas_limit: U256::from(10000000u64),
             pre_verification_gas: U256::from(10000000u64),
             max_fee_per_gas: U256::from(10000u64),
             max_priority_fee_per_gas: U256::from(10000u64),
-            paymaster: Address::ZERO,
-            paymaster_verification_gas_limit: U256::from(10000000u64),
-            paymaster_post_op_gas_limit: U256::from(10000000u64),
-            paymaster_data: Bytes::default(),
+            paymaster: None,
+            paymaster_verification_gas_limit: Some(U256::from(10000000u64)),
+            paymaster_post_op_gas_limit: Some(U256::from(10000000u64)),
+            paymaster_data: None,
             signature: Bytes::default(),
         }
     }
