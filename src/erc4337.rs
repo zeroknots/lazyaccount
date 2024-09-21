@@ -58,8 +58,8 @@ impl PackedUserOperationBuilder for PackedUserOperation {
             max_fee_per_gas: U256::from(1),
             max_priority_fee_per_gas: U256::from(1),
             paymaster: None,
-            paymaster_verification_gas_limit: Some(U256::from(100000)),
-            paymaster_post_op_gas_limit: Some(U256::from(1000000)),
+            paymaster_verification_gas_limit: None,
+            paymaster_post_op_gas_limit: None,
             paymaster_data: None,
             signature: Bytes::default(),
         }

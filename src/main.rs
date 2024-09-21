@@ -7,9 +7,13 @@ mod types;
 use std::fs;
 
 use accounts::SmartAccount;
-use alloy::primitives::{aliases::U192, Address};
+use alloy::{
+    primitives::{aliases::U192, Address, Bytes},
+    sol,
+    sol_types::SolEvent,
+};
 use clap::Parser;
-use cli::{Cli, ExecuteCmd, ModuleCli, ModuleCmd};
+use cli::{Cli, ExecuteCmd, ModuleCli, ModuleCmd, ModuleSubCmd};
 use types::Executions;
 
 pub type RootProviderType =
@@ -25,10 +29,21 @@ pub(crate) fn address_to_key(address: &Address) -> U192 {
     U192::from_be_bytes(key_bytes)
 }
 
+sol! {
+    #[derive(Debug, PartialEq, Eq)]
+    contract Test {
+        event ModuleInitialized(address indexed account, address owner);
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    println!(
+        "ModuleInitialized event: {:?}",
+        Test::ModuleInitialized::SIGNATURE_HASH
+    );
     match cli {
         Cli::Execute(ExecuteCmd { input, base }) => {
             let account = SmartAccount::from_base_args(base).await?;
@@ -40,18 +55,20 @@ async fn main() -> Result<()> {
 
             account.execute(executions, 0).await?;
         }
-        Cli::Module(ModuleCmd {
-            module: inner_cmd,
-            base,
-        }) => {
-            let account = SmartAccount::from_base_args(base).await?;
-
+        Cli::Module { module: inner_cmd } => {
             match inner_cmd {
-                ModuleCli::Install(cmd) => {
-                    // account
-                    // .install_module(cmd.module_type_id, cmd.module_address, cmd.init_data)
-                    // .await?;
-                    unimplemented!()
+                ModuleCli::Install(ModuleSubCmd {
+                    module,
+                    module_type_id,
+                    data,
+                    base,
+                }) => {
+                    let account = SmartAccount::from_base_args(base).await?;
+
+                    let data = hex::decode(data)?;
+                    account
+                        .install_module(module_type_id, module, Bytes::from(data))
+                        .await?;
                 }
                 ModuleCli::Uninstall(cmd) => {
                     // account
@@ -59,11 +76,23 @@ async fn main() -> Result<()> {
                     //     .await?;
                     unimplemented!()
                 }
-                ModuleCli::IsInstalled(cmd) => {
-                    // account
-                    //     .is_module_installed(cmd.module_type_id, cmd.module_address, cmd.additional_context)
-                    //     .await?;
-                    unimplemented!()
+                ModuleCli::IsInstalled(ModuleSubCmd {
+                    module_type_id,
+                    module,
+                    data: additional_context,
+                    base,
+                }) => {
+                    let account = SmartAccount::from_base_args(base).await?;
+
+                    let additional_context = hex::decode(additional_context)?;
+                    let is_installed = account
+                        .is_module_installed(
+                            module_type_id,
+                            module,
+                            Bytes::from(additional_context),
+                        )
+                        .await?;
+                    println!("Is module installed: {}", is_installed);
                 }
             }
         }

@@ -1,8 +1,10 @@
 use alloy::network::Network;
-use alloy::primitives::{Address, Bytes, FixedBytes};
+use alloy::primitives::{Address, Bytes, FixedBytes, Log, U256};
 use alloy::providers::Provider;
-use alloy::rpc::types::PackedUserOperation;
+use alloy::rpc::types::{PackedUserOperation, TransactionReceipt};
+use alloy::sol_types::{SolCall, SolValue};
 use alloy::transports::Transport;
+use alloy_provider::ext::Erc4337Api;
 use alloy_provider::ProviderBuilder;
 
 use async_trait::async_trait;
@@ -10,7 +12,7 @@ use async_trait::async_trait;
 use super::erc7579::Execution;
 use crate::cli::BaseArgs;
 use crate::erc4337::{EntryPointApi, PackedUserOperationBuilder, ENTRYPOINT};
-use crate::erc7579::ExecutionBuilder;
+use crate::erc7579::{ERC7579Account, ERC7579ViewAccountApi, ExecutionBuilder};
 use crate::Result;
 use crate::RootProviderType;
 
@@ -109,15 +111,19 @@ impl SmartAccount {
         Ok(account)
     }
 
+    // TODO: support multiple validators
+    pub async fn get_nonce(&self) -> Result<U256> {
+        let validator = self.validators[0];
+        let key = crate::address_to_key(&validator);
+        self.rpc.get_nonce(self.account_address, key).await
+    }
+
     pub async fn execute(
         &self,
         executions: Vec<Execution>,
         _validator_index: usize,
     ) -> Result<FixedBytes<32>> {
-        // TODO: support multiple validators
-        let validator = self.validators[0];
-        let key = crate::address_to_key(&validator);
-        let nonce = self.rpc.get_nonce(self.account_address, key).await?;
+        let nonce = self.get_nonce().await?;
         let call_data = executions.encode_executions();
 
         let user_op = PackedUserOperation::default()
@@ -146,4 +152,82 @@ impl SmartAccount {
         println!("Submitted user operation: {:?}", user_op_hash);
         Ok(user_op_hash)
     }
+
+    pub async fn install_module(
+        &self,
+        module_type_id: U256,
+        module: Address,
+        init_data: Bytes,
+    ) -> Result<FixedBytes<32>> {
+        let nonce = self.get_nonce().await?;
+        println!("module_type_id: {:?}", module_type_id);
+        println!("init_data: {:?}", init_data);
+
+        let call = ERC7579Account::installModuleCall {
+            moduleTypeId: module_type_id,
+            module,
+            initData: init_data,
+        };
+        let mut call_data = Vec::new();
+        call_data.extend(ERC7579Account::installModuleCall::SELECTOR.to_vec());
+        call_data.extend(call.moduleTypeId.abi_encode());
+        call_data.extend(call.module.abi_encode());
+
+        // Do not encode the `initData`
+        call_data.extend(call.initData.to_vec());
+
+        // let call_data = call.abi_encode();
+        let user_op = PackedUserOperation::default()
+            .with_call_data(Bytes::from(call_data))
+            .with_sender(self.account_address)
+            .with_nonce(nonce);
+
+        println!(
+            "Submitting {:?}",
+            serde_json::to_string_pretty(&user_op)
+                .unwrap()
+                .replace("\n", "")
+        );
+
+        let user_op_hash = self
+            .bundler
+            .client()
+            .request("eth_sendUserOperation", (user_op, ENTRYPOINT))
+            .await?;
+
+        println!("Submitted user operation: {:?}", user_op_hash);
+        Ok(user_op_hash)
+    }
+
+    pub async fn is_module_installed(
+        &self,
+        module_type_id: U256,
+        module: Address,
+        additional_context: Bytes,
+    ) -> Result<bool> {
+        self.rpc
+            .is_module_installed(
+                self.account_address,
+                module_type_id,
+                module,
+                additional_context,
+            )
+            .await
+    }
+
+    pub async fn account_id(&self, module_manager: Address) -> Result<String> {
+        self.rpc.account_id(module_manager).await
+    }
+}
+
+/// TODO: fix alloy issue upstream
+/// Represents the receipt of a user operation.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserOperationReceipt {
+    pub user_operation: PackedUserOperation,
+    pub transaction_hash: Bytes,
+    pub block_hash: Bytes,
+    pub block_number: U256,
+    pub entry_point: Address,
 }

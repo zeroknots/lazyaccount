@@ -1843,6 +1843,7 @@ dependencies = [
  "clap",
  "directories",
  "eyre",
+ "hex",
  "serde",
  "serde_json",
  "thiserror",

@@ -7,7 +7,10 @@ use url::Url;
 #[derive(Debug, clap::Parser)]
 pub enum Cli {
     Execute(ExecuteCmd),
-    Module(ModuleCmd),
+    Module {
+        #[command(subcommand)]
+        module: ModuleCli,
+    },
 }
 
 /// Base args for all commands
@@ -40,8 +43,6 @@ pub struct ExecuteCmd {
 pub struct ModuleCmd {
     #[command(subcommand)]
     pub module: ModuleCli,
-    #[command(flatten)]
-    pub base: BaseArgs,
 }
 
 /// Commands related to modules
@@ -56,12 +57,14 @@ pub enum ModuleCli {
 #[derive(Debug, clap::Parser)]
 pub struct ModuleSubCmd {
     /// Module type id
-    #[arg(short, long)]
+    #[arg(short = 't', long)]
     pub module_type_id: U256,
     /// Module address
-    #[arg(short, long)]
+    #[arg(short = 'm', long)]
     pub module: Address,
     /// Module init/deinit data or additional context for `isModuleInstalled`
     #[arg(short, long)]
-    pub data: Bytes,
+    pub data: String,
+    #[command(flatten)]
+    pub base: BaseArgs,
 }

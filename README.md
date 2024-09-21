@@ -44,3 +44,18 @@ By default, it uses local `anvil` and `alto` instances at `8545` and `8546` port
 
 #### Install Module
 
+To install a module, run the `module install` subcommand:
+
+```bash
+cargo run module install --account <address> --validator <validator-address> --module <module-address> --module-type-id <1|2|3|4> --data <hex-data-no-prefix>
+```
+
+Where module data is the address of the smart account that will be used to install the module.
+
+#### Is Module Installed
+
+To check if a module is installed, run the `module installed` subcommand:
+
+```bash
+cargo run module is-installed --account <address> --validator <validator-address> --module <module-address> --module-type-id <1|2|3|4> --data <hex-data-no-prefix>
+```
