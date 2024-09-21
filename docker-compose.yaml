@@ -31,3 +31,5 @@ services:
     environment:
       - ANVIL_RPC=http://anvil:8545
       - SKIP_DEPLOYMENTS=true
+    volumes:
+      - ./alto-config.json:/app/alto-config.json

@@ -1,60 +1,68 @@
 mod accounts;
+mod cli;
+mod config;
 mod erc4337;
 mod erc7579;
-use accounts::{AccountType, SmartAccountBuilder};
-use alloy_provider::{ext::Erc4337Api, ProviderBuilder, RootProvider};
-use erc4337::EntryPointApi;
-use erc7579::Execution;
-use url::Url;
+mod utils;
 
-use alloy::{
-    hex::FromHex,
-    primitives::{address, aliases::U192, Bytes, U256},
-};
+use std::fs;
+
+use accounts::SmartAccount;
+use clap::Parser;
+use cli::{Cli, ExecuteCmd, ModuleCli, ModuleCmd};
+use config::Config;
 
 pub type RootProviderType =
     alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    let rpc_url = Url::parse("http://localhost:8545")?;
-    let bundler_url = Url::parse("http://localhost:4337")?;
+    // let rpc_url = Url::parse("http://localhost:8545")?;
+    // let bundler_url = Url::parse("http://localhost:4337")?;
 
-    let account_address = address!("c2b17e73603dccc195118a36f3203134fd7985f5");
-    let validator_address = address!("503b54Ed1E62365F0c9e4caF1479623b08acbe77");
+    // let account_address = address!("c2b17e73603dccc195118a36f3203134fd7985f5");
+    // let validator_address = address!("503b54Ed1E62365F0c9e4caF1479623b08acbe77");
 
-    let provider = ProviderBuilder::new().on_http(rpc_url);
-    let bundler = ProviderBuilder::new().on_http(bundler_url);
+    let cli = Cli::parse();
 
-    let account = provider
-        .connect(
-            Some(account_address),
-            AccountType::Safe7579,
-            Box::new(bundler.clone()),
-            Box::new(provider.clone()),
-        )
-        .await?;
+    match cli {
+        Cli::Execute(ExecuteCmd { input, base }) => {
+            let account = SmartAccount::from_base_args(base).await?;
 
-    let mut key = [0u8; 24];
-    key[4..].copy_from_slice(validator_address.as_slice());
+            let input = fs::read_to_string(input)?;
+            let config: Config = serde_json::from_str(&input)?;
 
-    let real_nonce = provider
-        .get_nonce(account_address, U192::from_be_bytes(key))
-        .await?;
+            let executions = config.executions;
 
-    println!("real nonce: {:?}", real_nonce.to_be_bytes_vec());
+            account.execute(executions, 0).await?;
+        }
+        Cli::Module(ModuleCmd {
+            module: inner_cmd,
+            base,
+        }) => {
+            let account = SmartAccount::from_base_args(base).await?;
 
-    println!("{:?}", account);
-
-    let executions: Vec<Execution> = vec![Execution {
-        target: account_address,
-        value: U256::from(100000),
-        // simple transfer
-        callData: Bytes::default(),
-    }];
-
-    account
-        .execute(bundler, validator_address, real_nonce, executions)
-        .await?;
+            match inner_cmd {
+                ModuleCli::Install(cmd) => {
+                    // account
+                    // .install_module(cmd.module_type_id, cmd.module_address, cmd.init_data)
+                    // .await?;
+                    unimplemented!()
+                }
+                ModuleCli::Uninstall(cmd) => {
+                    // account
+                    //     .uninstall_module(cmd.module_type_id, cmd.module_address, cmd.deinit_data)
+                    //     .await?;
+                    unimplemented!()
+                }
+                ModuleCli::IsInstalled(cmd) => {
+                    // account
+                    //     .is_module_installed(cmd.module_type_id, cmd.module_address, cmd.additional_context)
+                    //     .await?;
+                    unimplemented!()
+                }
+            }
+        }
+    }
     Ok(())
 }

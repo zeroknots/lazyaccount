@@ -1,8 +1,7 @@
-use alloy::primitives::aliases::U192;
-use alloy::primitives::{Address, Bytes, FixedBytes, U256};
+use alloy::primitives::{Bytes, FixedBytes};
 use alloy::sol;
 use alloy::sol_types::{SolCall, SolValue};
-use std::marker::PhantomData;
+use serde::{Deserialize, Serialize};
 
 pub const SINGLE_EXECUTION_MODE: ModeCode = ModeCode(FixedBytes([0x00; 32]));
 pub const BATCH_EXECUTION_MODE: ModeCode = ModeCode({
@@ -19,7 +18,7 @@ sol! {
     type ModeSelector is bytes4;
     type ModePayload is bytes22;
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct Execution {
         address target;
         uint256 value;
