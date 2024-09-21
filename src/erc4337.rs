@@ -1,3 +1,4 @@
+use crate::Result;
 use alloy::network::Network;
 use alloy::primitives::aliases::U192;
 use alloy::primitives::{address, Address, Bytes, U256};
@@ -12,10 +13,12 @@ sol! {
         function getNonce(address sender, uint192 key) external view returns (uint256 nonce);
     }
 }
+/// `Entrypoint` contract address on Sepolia
 pub(crate) const ENTRYPOINT: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
 
+/// API for interacting with the EntryPoint contract
 pub trait EntryPointApi<N, T>: Send + Sync {
-    async fn get_nonce(&self, account: Address, key: U192) -> eyre::Result<U256>;
+    async fn get_nonce(&self, account: Address, key: U192) -> Result<U256>;
 }
 
 impl<N, T, P> EntryPointApi<N, T> for P
@@ -24,7 +27,7 @@ where
     T: Transport + Clone,
     P: Provider<T, N>,
 {
-    async fn get_nonce(&self, account: Address, key: U192) -> eyre::Result<U256> {
+    async fn get_nonce(&self, account: Address, key: U192) -> Result<U256> {
         let contract = EntryPoint::new(ENTRYPOINT, self);
         let EntryPoint::getNonceReturn { nonce } = contract.getNonce(account, key).call().await?;
         println!("Nonce: {:?}", nonce);
@@ -32,6 +35,7 @@ where
     }
 }
 
+/// Builder trait for `PackedUserOperation`
 pub trait PackedUserOperationBuilder {
     fn default() -> Self;
     fn with_sender(self, sender: Address) -> Self;

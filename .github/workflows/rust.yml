@@ -1,0 +1,48 @@
+# Basic rust workflow for github actions
+name: Rust
+
+on:
+  push:
+    branches:
+      - main
+      - feat/v2.1.0
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          profile: minimal
+      - name: Build
+        run: cargo build --release
+      - name: Test
+        run: cargo test --release
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          profile: minimal
+      - name: Clippy
+        run: cargo clippy --fix --allow-dirty
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          profile: minimal

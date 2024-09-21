@@ -11,8 +11,10 @@ use super::erc7579::Execution;
 use crate::cli::BaseArgs;
 use crate::erc4337::{EntryPointApi, PackedUserOperationBuilder, ENTRYPOINT};
 use crate::erc7579::ExecutionBuilder;
-use crate::{utils, RootProviderType};
+use crate::Result;
+use crate::RootProviderType;
 
+/// The type of account to be used
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AccountType {
     Nexus,
@@ -20,6 +22,7 @@ pub enum AccountType {
     Kernel,
 }
 
+/// The smart account, which is used to execute the user operations
 #[derive(Debug, Clone)]
 pub struct SmartAccount {
     account_address: Address,
@@ -40,7 +43,7 @@ pub trait SmartAccountBuilder<N, T>: Send + Sync {
         account_type: AccountType,
         bundler: Box<RootProviderType>,
         rpc: Box<RootProviderType>,
-    ) -> eyre::Result<SmartAccount>;
+    ) -> Result<SmartAccount>;
 
     async fn is_contract(&self, account: Address) -> bool;
 }
@@ -59,13 +62,14 @@ where
         false
     }
 
+    /// Connect to the smart account
     async fn connect(
         &self,
         account_address: Address,
         account_type: AccountType,
         bundler: Box<RootProviderType>,
         rpc: Box<RootProviderType>,
-    ) -> eyre::Result<SmartAccount> {
+    ) -> Result<SmartAccount> {
         let is_initialized = self.is_contract(account_address).await;
 
         let smart_account = SmartAccount {
@@ -83,7 +87,7 @@ where
 }
 
 impl SmartAccount {
-    pub async fn from_base_args(base_args: BaseArgs) -> eyre::Result<SmartAccount> {
+    pub async fn from_base_args(base_args: BaseArgs) -> Result<SmartAccount> {
         let bundler = ProviderBuilder::new().on_http(base_args.bundler);
         let rpc = ProviderBuilder::new().on_http(base_args.client);
 
@@ -109,10 +113,10 @@ impl SmartAccount {
         &self,
         executions: Vec<Execution>,
         _validator_index: usize,
-    ) -> eyre::Result<FixedBytes<32>> {
+    ) -> Result<FixedBytes<32>> {
         // TODO: support multiple validators
         let validator = self.validators[0];
-        let key = utils::address_to_key(&validator);
+        let key = crate::address_to_key(&validator);
         let nonce = self.rpc.get_nonce(self.account_address, key).await?;
         let call_data = executions.encode_executions();
 
@@ -121,9 +125,15 @@ impl SmartAccount {
             .with_sender(self.account_address)
             .with_nonce(nonce);
 
-        println!("{:?}", serde_json::to_string_pretty(&user_op).unwrap());
+        println!(
+            "Submitting {:?}",
+            serde_json::to_string_pretty(&user_op)
+                .unwrap()
+                .replace("\n", "")
+        );
 
-        // TODO: fix upstream issue where `send_user_operation` result is not properly deserialized
+        // TODO: fix upstream issue where `send_user_operation` result is not properly deserialized and uncomment lines below
+
         // self.bundler
         //     .send_user_operation(SendUserOperation::EntryPointV07(user_op), ENTRYPOINT)
         //     .await?;

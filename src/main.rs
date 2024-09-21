@@ -1,28 +1,32 @@
 mod accounts;
 mod cli;
-mod config;
 mod erc4337;
 mod erc7579;
-mod utils;
+mod types;
 
 use std::fs;
 
 use accounts::SmartAccount;
+use alloy::primitives::{aliases::U192, Address};
 use clap::Parser;
 use cli::{Cli, ExecuteCmd, ModuleCli, ModuleCmd};
-use config::Config;
+use types::Executions;
 
 pub type RootProviderType =
     alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>;
 
+pub type Result<T> = eyre::Result<T>;
+
+/// Convert address to key
+/// TODO: move to utils once there are more utility functions
+pub(crate) fn address_to_key(address: &Address) -> U192 {
+    let mut key_bytes = [0u8; 24];
+    key_bytes[..20].copy_from_slice(&address.as_slice());
+    U192::from_be_bytes(key_bytes)
+}
+
 #[tokio::main]
-async fn main() -> eyre::Result<()> {
-    // let rpc_url = Url::parse("http://localhost:8545")?;
-    // let bundler_url = Url::parse("http://localhost:4337")?;
-
-    // let account_address = address!("c2b17e73603dccc195118a36f3203134fd7985f5");
-    // let validator_address = address!("503b54Ed1E62365F0c9e4caF1479623b08acbe77");
-
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli {
@@ -30,7 +34,7 @@ async fn main() -> eyre::Result<()> {
             let account = SmartAccount::from_base_args(base).await?;
 
             let input = fs::read_to_string(input)?;
-            let config: Config = serde_json::from_str(&input)?;
+            let config: Executions = serde_json::from_str(&input)?;
 
             let executions = config.executions;
 
