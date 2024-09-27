@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-alloy-primitives = "0.3.0"  
-alloy-contract = { version = "0.3" }
-alloy-provider = { version = "0.3", features = ["erc4337-api"]}
+alloy-primitives = { git = "https://github.com/dastanbeksamatov/core.git" }
+alloy-contract = { git = "https://github.com/dastanbeksamatov/alloy.git" }
+alloy-provider = { git = "https://github.com/dastanbeksamatov/alloy.git", features = ["erc4337-api"]}
 url = "2.3"
-alloy = { version = "0.3", features = ["full","node-bindings"] }
+alloy = { git = "https://github.com/dastanbeksamatov/alloy.git", features = ["full", "node-bindings", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 clap = { version = "4.3", features = ["derive"] }
@@ -19,3 +19,4 @@ eyre = "0.6.12"
 thiserror = "1.0.63"
 directories = "5.0.1"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"]}
+hex = "0.4.3"
