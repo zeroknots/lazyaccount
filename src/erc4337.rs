@@ -1,114 +1,82 @@
-use crate::account::SmartAccount;
-use alloy::primitives::{address, b256, Address, Bytes, FixedBytes, B256, U256};
+use crate::Result;
+use alloy::network::Network;
+use alloy::primitives::aliases::U192;
+use alloy::primitives::{address, Address, Bytes, U256};
+use alloy::providers::Provider;
+use alloy::rpc::types::PackedUserOperation;
 use alloy::sol;
-use async_trait::async_trait;
-use std::error::Error as StdError;
+use alloy::transports::Transport;
 
 sol! {
-    #[derive(Debug, PartialEq, Eq)]
-    type ModeCode is bytes32;
-    type CallType is bytes1;
-    type ExecType is bytes1;
-    type ModeSelector is bytes4;
-    type ModePayload is bytes22;
-
-
-    #[derive(Debug, PartialEq, Eq)]
-    struct Execution {
-        address target;
-        uint256 value;
-        bytes callData;
-    }
-
-    #[derive(Debug, PartialEq, Eq)]
-    contract ERC7579Account {
-        function execute(ModeCode mode, bytes calldata executionCalldata) external;
-        function installModule(uint256 moduleTypeId, address module, bytes calldata initData) external;
-        function uninstallModule(uint256 moduleTypeId, address module, bytes calldata deInitData) external;
-        function isModuleInstalled(uint256 moduleTypeId, address module, bytes calldata additionalContext) external view returns (bool);
-    }
-}
-
-sol! {
-    #[derive(Debug)]
-    struct PackedUserOperation {
-        address sender;
-        uint256 nonce;
-        bytes initCode;
-        bytes callData;
-        bytes32 accountGasLimits;
-        uint256 preVerificationGas;
-        bytes32 gasFees;
-        bytes paymasterAndData;
-        bytes signature;
-    }
-
     #[sol(rpc)]
     contract EntryPoint {
-        function handleOps(PackedUserOperation[] calldata ops, address payable beneficiary) external;
         function getNonce(address sender, uint192 key) external view returns (uint256 nonce);
     }
 }
+/// `Entrypoint` contract address on Sepolia
+pub(crate) const ENTRYPOINT: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
 
-const ENTRYPOINT_ADDR: Address = address!("0000000071727De22E5E9d8BAf0edAc6f37da032");
+/// API for interacting with the EntryPoint contract
+pub trait EntryPointApi<N, T>: Send + Sync {
+    async fn get_nonce(&self, account: Address, key: U192) -> Result<U256>;
+}
 
-pub const SINGLE_EXECUTION_MODE: ModeCode = ModeCode(FixedBytes([0x00; 32]));
-pub const BATCH_EXECUTION_MODE: ModeCode = ModeCode({
-    let mut bytes = [0x00; 32];
-    bytes[0] = 0x01;
-    FixedBytes(bytes)
-});
+impl<N, T, P> EntryPointApi<N, T> for P
+where
+    N: Network,
+    T: Transport + Clone,
+    P: Provider<T, N>,
+{
+    async fn get_nonce(&self, account: Address, key: U192) -> Result<U256> {
+        let contract = EntryPoint::new(ENTRYPOINT, self);
+        let EntryPoint::getNonceReturn { nonce } = contract.getNonce(account, key).call().await?;
+        println!("Nonce: {:?}", nonce);
+        Ok(nonce)
+    }
+}
 
-impl PackedUserOperation {
-    pub fn new() -> PackedUserOperation {
+/// Builder trait for `PackedUserOperation`
+pub trait PackedUserOperationBuilder {
+    fn default() -> Self;
+    fn with_sender(self, sender: Address) -> Self;
+    fn with_nonce(self, nonce: U256) -> Self;
+    fn with_call_data(self, call_data: Bytes) -> Self;
+    fn set_signature(self, signature: Bytes) -> Self;
+}
+
+impl PackedUserOperationBuilder for PackedUserOperation {
+    fn default() -> Self {
         PackedUserOperation {
-            sender: Address::default(),
+            sender: Address::ZERO,
             nonce: U256::from(0),
-            initCode: Bytes::default(),
-            callData: Bytes::default(),
-            accountGasLimits: b256!(
-                "0000000000000000000000000000000000000000000000000000000000000010"
-            ),
-            preVerificationGas: U256::from(100000),
-            gasFees: b256!("0000000000000000000000000000000000000000000000000000000000000010"),
-            paymasterAndData: Bytes::default(),
+            factory: None,
+            factory_data: None,
+            call_data: Bytes::default(),
+            call_gas_limit: U256::from(100000),
+            verification_gas_limit: U256::from(1000000),
+            pre_verification_gas: U256::from(100000),
+            max_fee_per_gas: U256::from(1),
+            max_priority_fee_per_gas: U256::from(1),
+            paymaster: None,
+            paymaster_verification_gas_limit: None,
+            paymaster_post_op_gas_limit: None,
+            paymaster_data: None,
             signature: Bytes::default(),
         }
     }
-    pub fn with_sender(mut self, sender: Address) -> Self {
+    fn with_call_data(mut self, call_data: Bytes) -> Self {
+        self.call_data = call_data;
+        self
+    }
+    fn with_sender(mut self, sender: Address) -> Self {
         self.sender = sender;
         self
     }
-
-    pub fn with_nonce(mut self, nonce: U256) -> Self {
+    fn with_nonce(mut self, nonce: U256) -> Self {
         self.nonce = nonce;
         self
     }
-    pub fn with_init_code(mut self, init_code: Bytes) -> Self {
-        self.initCode = init_code;
-        self
-    }
-    pub fn with_calldata(mut self, callData: Bytes) -> Self {
-        self.callData = callData;
-        self
-    }
-    pub fn with_account_gas_limits(mut self, account_gas_limits: B256) -> Self {
-        self.accountGasLimits = account_gas_limits;
-        self
-    }
-    pub fn with_pre_verification_gas(mut self, pre_verification_gas: U256) -> Self {
-        self.preVerificationGas = pre_verification_gas;
-        self
-    }
-    pub fn with_gas_fees(mut self, gas_fees: B256) -> Self {
-        self.gasFees = gas_fees;
-        self
-    }
-    pub fn with_paymaster_and_data(mut self, paymaster_and_data: Bytes) -> Self {
-        self.paymasterAndData = paymaster_and_data;
-        self
-    }
-    pub fn with_signature(mut self, signature: Bytes) -> Self {
+    fn set_signature(mut self, signature: Bytes) -> Self {
         self.signature = signature;
         self
     }

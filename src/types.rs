@@ -1,29 +1,13 @@
-use alloy::network::{Ethereum, EthereumWallet};
-use alloy::providers::fillers::{
-    ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
-};
+//! Some types used in the project
 
-pub type HttpProvider<'a> = alloy::providers::fillers::FillProvider<
-    alloy::providers::fillers::JoinFill<
-        alloy::providers::Identity,
-        alloy::providers::fillers::WalletFiller<&'a EthereumWallet>,
-    >,
-    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>,
-    alloy::transports::http::Http<alloy::transports::http::Client>,
-    alloy::network::Ethereum,
->;
-pub type RootProviderType<'a> =
-    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>;
+use alloy::primitives::Address;
+use serde::{Deserialize, Serialize};
 
-pub type Foo<'a> = FillProvider<
-    JoinFill<
-        JoinFill<
-            JoinFill<JoinFill<alloy::providers::Identity, GasFiller>, NonceFiller>,
-            ChainIdFiller,
-        >,
-        WalletFiller<&'a EthereumWallet>,
-    >,
-    alloy::providers::RootProvider<alloy::transports::http::Http<alloy::transports::http::Client>>,
-    alloy::transports::http::Http<alloy::transports::http::Client>,
-    alloy::network::Ethereum,
->;
+use crate::erc7579::Execution;
+
+/// Configuration for the execution file
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Executions {
+    pub entrypoint: Address,
+    pub executions: Vec<Execution>,
+}
